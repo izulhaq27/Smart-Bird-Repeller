@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ]);
 
             updateUI(pir, distance, buzzer, led);
-            checkAndLogActivity(pir, distance);
+            checkAndLogActivity(pir, distance, buzzer);
 
         } catch (err) {
             console.error('Fetch error:', err);
@@ -94,7 +94,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const d = parseFloat(distance);
         if (!isNaN(d) && d > 0) {
             el.distanceValue.textContent = d.toFixed(1);
-            if (d < 150 && pir == '1') {
+            // Dynamic check: depend on Buzzer state from Arduino instead of hardcoded limits
+            if (buzzer == '1') {
                 el.distanceValue.style.color = 'var(--pink)';
                 el.cardDistance.classList.add('alert');
             } else {
@@ -135,8 +136,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ===== CHECK & LOG ACTIVITY =====
-    function checkAndLogActivity(pir, distance) {
-        if (pir == '1' && distance && parseFloat(distance) < 500 && parseFloat(distance) > 0) {
+    function checkAndLogActivity(pir, distance, buzzer) {
+        if (buzzer == '1' && distance && parseFloat(distance) > 0) {
             const now = Date.now();
             if (now - lastDetectionTime > 10000) {
                 addLogEntry(distance);
