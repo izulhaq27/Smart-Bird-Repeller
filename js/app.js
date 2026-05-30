@@ -1,324 +1,226 @@
-// ============================================
-// SMART BIRD REPELLER DASHBOARD
-// ============================================
-
-// State aplikasi
-const appState = {
-    isOnline: false,
-    lastUpdate: null,
-    detectionCount: {
-        today: 0,
-        total: 0,
-    },
-    activityLog: [],
-    autoRefreshInterval: null,
-};
-
-// ============================================
-// INISIALISASI
-// ============================================
-
+// Main Application Logic
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Smart Bird Repeller Dashboard Loading...');
+    // Inisialisasi API
+    const blynkApi = new BlynkAPI(BLYNK_CONFIG);
     
-    // Load data dari localStorage
-    loadFromLocalStorage();
-    
-    // Refresh data pertama kali
-    refreshData();
-    
-    // Auto-refresh setiap 5 detik
-    startAutoRefresh();
-    
-    console.log('✅ Dashboard initialized');
-});
+    // UI Elements
+    const elements = {
+        statusDot: document.getElementById('status-dot'),
+        statusPing: document.getElementById('status-ping'),
+        deviceStatus: document.getElementById('device-status'),
+        
+        pirValue: document.getElementById('pir-value'),
+        pirDesc: document.getElementById('pir-desc'),
+        
+        distanceValue: document.getElementById('distance-value'),
+        
+        buzzerValue: document.getElementById('buzzer-value'),
+        buzzerDesc: document.getElementById('buzzer-desc'),
+        
+        ledValue: document.getElementById('led-value'),
+        ledDesc: document.getElementById('led-desc'),
+        
+        activityList: document.getElementById('activity-list'),
+        emptyLogMsg: document.getElementById('empty-log-msg'),
+        clearLogBtn: document.getElementById('clear-log')
+    };
 
-// ============================================
-// REFRESH DATA UTAMA
-// ============================================
+    // Activity Log State
+    let activityLogs = JSON.parse(localStorage.getItem('birdRepellerLogs')) || [];
+    let lastDetectionTime = 0;
 
-async function refreshData() {
-    try {
-        // Disable refresh button
-        const refreshBtn = document.querySelector('#refreshIcon');
-        refreshBtn?.classList.add('animate-spin');
-        
-        // Fetch data dari Blynk
-        const onlineStatus = await blynkAPI.checkOnlineStatus();
-        const pinData = await blynkAPI.getAllPins();
-        
-        // Update state
-        appState.isOnline = onlineStatus;
-        appState.lastUpdate = new Date();
-        
-        // Update UI
-        updateDeviceStatus(onlineStatus);
-        updateSensorData(pinData);
-        updateActivityDisplay();
-        updateLastUpdateTime();
-        
-        // Debug info
-        if (!onlineStatus) {
-            console.warn('⚠️ Device offline - Pastikan:');
-            console.warn('1. Arduino sudah upload kode dengan BLYNK_READ(V0-V3)');
-            console.warn('2. Token di config.js benar');
-            console.warn('3. ESP32 terhubung ke WiFi dan Blynk');
-        }
-        
-        console.log('📊 Data synced:', { onlineStatus, pinData });
-        
-    } catch (error) {
-        console.error('❌ Error refreshing data:', error);
-    } finally {
-        const refreshBtn = document.querySelector('#refreshIcon');
-        refreshBtn?.classList.remove('animate-spin');
-    }
-}
+    // Initialize Logs UI
+    renderLogs();
 
-// ============================================
-// UPDATE DEVICE STATUS
-// ============================================
-
-function updateDeviceStatus(isOnline) {
-    const statusBadge = document.getElementById('deviceStatus');
-    const statusPulse = document.getElementById('statusPulse');
-    const blynkStatus = document.getElementById('blynkStatus');
-    
-    if (isOnline) {
-        statusBadge.className = 'status-badge status-online';
-        statusBadge.innerHTML = '<i class="fas fa-check-circle"></i> Online';
-        statusPulse.className = 'pulse-dot online';
-        blynkStatus.textContent = '✓ Terhubung';
-        blynkStatus.style.color = '#10b981';
-    } else {
-        statusBadge.className = 'status-badge status-offline';
-        statusBadge.innerHTML = '<i class="fas fa-times-circle"></i> Offline';
-        statusPulse.className = 'pulse-dot offline';
-        blynkStatus.textContent = '✗ Terputus';
-        blynkStatus.style.color = '#dc2626';
-    }
-}
-
-// ============================================
-// UPDATE SENSOR DATA
-// ============================================
-
-function updateSensorData(pinData) {
-    // PIR Status
-    if (pinData.pir !== null) {
-        const pirValue = parseInt(pinData.pir) || 0;
-        const pirStatus = pirValue === 1 ? 'Gerakan Terdeteksi ⚠️' : 'Tidak Ada Gerakan ✓';
-        const pirColor = pirValue === 1 ? '#dc2626' : '#10b981';
+    /**
+     * Update status device (Online/Offline)
+     */
+    async function updateDeviceStatus() {
+        const isOnline = await blynkApi.isDeviceOnline();
         
-        const pirEl = document.getElementById('pirStatus');
-        pirEl.textContent = pirStatus;
-        pirEl.style.color = pirColor;
-        
-        // Log deteksi jika ada gerakan baru
-        if (pirValue === 1) {
-            logDetectionEvent(pinData.distance);
+        if (isOnline) {
+            elements.deviceStatus.textContent = 'Device Online';
+            elements.deviceStatus.className = 'font-medium text-green-400';
+            elements.statusDot.className = 'relative inline-flex rounded-full h-3 w-3 bg-green-500';
+            elements.statusPing.classList.remove('hidden');
+        } else {
+            elements.deviceStatus.textContent = 'Device Offline';
+            elements.deviceStatus.className = 'font-medium text-red-400';
+            elements.statusDot.className = 'relative inline-flex rounded-full h-3 w-3 bg-red-500';
+            elements.statusPing.classList.add('hidden');
         }
     }
-    
-    // Distance Sensor
-    if (pinData.distance !== null) {
-        const distance = parseFloat(pinData.distance) || 0;
-        const distanceEl = document.getElementById('distanceValue');
-        
-        distanceEl.textContent = distance.toFixed(1);
-        
-        // Status jarak
-        const threshold = LOCAL_CONFIG.distanceThreshold;
-        const statusEl = document.getElementById('distanceStatus');
-        let status = '';
-        let color = '#10b981';
-        
-        if (distance > 0) {
-            if (distance < threshold) {
-                status = `⚠️ Dalam Jangkauan (< ${threshold} cm)`;
-                color = '#dc2626';
+
+    /**
+     * Fetch all sensor data
+     */
+    async function fetchSensorData() {
+        try {
+            // Fetch all pins concurrently
+            const [pir, distance, buzzer, led] = await Promise.all([
+                blynkApi.getPinValue(BLYNK_CONFIG.pins.pir),
+                blynkApi.getPinValue(BLYNK_CONFIG.pins.distance),
+                blynkApi.getPinValue(BLYNK_CONFIG.pins.buzzer),
+                blynkApi.getPinValue(BLYNK_CONFIG.pins.led)
+            ]);
+
+            updateUI(pir, distance, buzzer, led);
+            checkAndLogActivity(pir, distance);
+            
+        } catch (error) {
+            console.error('Error fetching sensor data:', error);
+        }
+    }
+
+    /**
+     * Update Dashboard UI
+     */
+    function updateUI(pir, distance, buzzer, led) {
+        // PIR Status
+        if (pir == '1') {
+            elements.pirValue.textContent = 'TERDETEKSI';
+            elements.pirValue.className = 'text-3xl font-bold mb-1 text-red-400';
+            elements.pirDesc.textContent = 'Ada pergerakan!';
+            elements.pirDesc.className = 'text-sm text-red-400';
+        } else {
+            elements.pirValue.textContent = 'Aman';
+            elements.pirValue.className = 'text-3xl font-bold mb-1 text-green-400';
+            elements.pirDesc.textContent = 'Tidak ada pergerakan';
+            elements.pirDesc.className = 'text-sm text-green-400';
+        }
+
+        // Distance
+        const distValue = parseFloat(distance);
+        if (!isNaN(distValue)) {
+            elements.distanceValue.textContent = distValue.toFixed(1);
+            if (distValue < 500 && pir == '1') {
+                elements.distanceValue.classList.add('text-red-400');
             } else {
-                status = `✓ Aman (> ${threshold} cm)`;
-                color = '#10b981';
+                elements.distanceValue.classList.remove('text-red-400');
+            }
+        } else {
+            elements.distanceValue.textContent = '--';
+        }
+
+        // Buzzer Status
+        if (buzzer == '1') {
+            elements.buzzerValue.textContent = 'ON';
+            elements.buzzerValue.className = 'text-3xl font-bold mb-1 text-red-400 animate-pulse';
+            elements.buzzerDesc.textContent = 'Alarm berbunyi';
+        } else {
+            elements.buzzerValue.textContent = 'OFF';
+            elements.buzzerValue.className = 'text-3xl font-bold mb-1';
+            elements.buzzerDesc.textContent = 'Alarm diam';
+        }
+
+        // LED Status
+        if (led == '1') {
+            elements.ledValue.textContent = 'ON';
+            elements.ledValue.className = 'text-3xl font-bold mb-1 text-yellow-400 animate-pulse';
+            elements.ledDesc.textContent = 'Lampu menyala';
+        } else {
+            elements.ledValue.textContent = 'OFF';
+            elements.ledValue.className = 'text-3xl font-bold mb-1';
+            elements.ledDesc.textContent = 'Lampu mati';
+        }
+    }
+
+    /**
+     * Logic to detect and log activity locally
+     */
+    function checkAndLogActivity(pir, distance) {
+        // Jika PIR mendeteksi (1) dan jarak masuk akal (< 500cm)
+        if (pir == '1' && distance && parseFloat(distance) < 500) {
+            const now = Date.now();
+            // Prevent spam log (hanya log tiap 10 detik minimal)
+            if (now - lastDetectionTime > 10000) {
+                addLogEntry(distance);
+                lastDetectionTime = now;
             }
         }
+    }
+
+    /**
+     * Add log to array and LocalStorage
+     */
+    function addLogEntry(distance) {
+        const date = new Date();
+        const timeStr = date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const dateStr = date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
         
-        statusEl.textContent = status;
-        statusEl.style.color = color;
-    }
-}
-
-// ============================================
-// ACTIVITY LOG MANAGEMENT
-// ============================================
-
-function logDetectionEvent(distance) {
-    // Cegah duplikat dalam 5 detik
-    const lastEvent = appState.activityLog[0];
-    const now = new Date();
-    
-    if (lastEvent) {
-        const timeDiff = now - new Date(lastEvent.timestamp);
-        if (timeDiff < 5000) return;
-    }
-    
-    const event = {
-        timestamp: now.toISOString(),
-        event: 'hama_terdeteksi',
-        description: 'Peringatan: Hama Burung Terdeteksi!',
-        distance: distance ? parseFloat(distance).toFixed(0) : '-',
-        severity: 'high',
-        icon: '⚠️'
-    };
-    
-    // Tambah ke log
-    appState.activityLog.unshift(event);
-    if (appState.activityLog.length > 50) {
-        appState.activityLog.pop();
-    }
-    
-    // Update statistik
-    appState.detectionCount.today++;
-    appState.detectionCount.total++;
-    
-    // Simpan ke localStorage
-    saveToLocalStorage();
-}
-
-function updateActivityDisplay() {
-    const logContainer = document.getElementById('activityLog');
-    
-    if (!appState.activityLog || appState.activityLog.length === 0) {
-        logContainer.innerHTML = `
-            <div class="text-center py-12 text-gray-500">
-                <i class="fas fa-inbox text-4xl mb-3 opacity-30"></i>
-                <p>Tidak ada aktivitas terdeteksi</p>
-                <p class="text-sm mt-1">Log aktivitas akan muncul saat hama terdeteksi</p>
-            </div>
-        `;
-        return;
-    }
-    
-    logContainer.innerHTML = '';
-    
-    // Tampilkan 10 event terbaru
-    appState.activityLog.slice(0, 10).forEach(event => {
-        const activityEl = createActivityElement(event);
-        logContainer.appendChild(activityEl);
-    });
-    
-    // Update statistik
-    updateStatistics();
-}
-
-function createActivityElement(event) {
-    const div = document.createElement('div');
-    div.className = 'activity-item bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition';
-    
-    const timestamp = new Date(event.timestamp);
-    const timeText = getTimeAgo(event.timestamp);
-    const fullTime = formatTime(timestamp);
-    
-    const distanceText = event.distance && event.distance !== '-' ? ` (Jarak: ${event.distance} cm)` : '';
-    
-    div.innerHTML = `
-        <div class="flex justify-between items-start">
-            <div class="flex gap-3 flex-1">
-                <div class="text-2xl mt-1">${event.icon}</div>
-                <div class="flex-1">
-                    <p class="font-semibold text-gray-800">${event.description}${distanceText}</p>
-                    <p class="text-xs text-gray-500 mt-1">
-                        <span class="font-mono">${fullTime}</span>
-                        <span class="text-gray-400 ml-2">${timeText}</span>
-                    </p>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    return div;
-}
-
-// ============================================
-// UPDATE STATISTIK
-// ============================================
-
-function updateStatistics() {
-    document.getElementById('detectionToday').textContent = appState.detectionCount.today;
-    document.getElementById('detectionTotal').textContent = appState.detectionCount.total;
-}
-
-// ============================================
-// UPDATE WAKTU
-// ============================================
-
-function updateLastUpdateTime() {
-    if (appState.lastUpdate) {
-        const time = appState.lastUpdate.toLocaleTimeString('id-ID', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-        });
-        document.getElementById('lastUpdate').textContent = `Terakhir diperbarui: ${time}`;
-    }
-}
-
-// ============================================
-// AUTO REFRESH
-// ============================================
-
-function startAutoRefresh() {
-    // Clear existing interval jika ada
-    if (appState.autoRefreshInterval) {
-        clearInterval(appState.autoRefreshInterval);
-    }
-    
-    // Set interval baru
-    appState.autoRefreshInterval = setInterval(() => {
-        refreshData();
-    }, BLYNK_CONFIG.refreshInterval);
-    
-    console.log(`✓ Auto-refresh started (interval: ${BLYNK_CONFIG.refreshInterval}ms)`);
-}
-
-// ============================================
-// LOCAL STORAGE
-// ============================================
-
-function saveToLocalStorage() {
-    try {
-        const data = {
-            log: appState.activityLog,
-            counts: appState.detectionCount,
-            lastSaved: new Date().toISOString()
+        const log = {
+            id: Date.now(),
+            time: `${dateStr} ${timeStr}`,
+            distance: parseFloat(distance).toFixed(1)
         };
-        localStorage.setItem('smartBirdRepeller', JSON.stringify(data));
-    } catch (error) {
-        console.warn('⚠️ Error saving to localStorage:', error);
-    }
-}
 
-function loadFromLocalStorage() {
-    try {
-        const stored = localStorage.getItem('smartBirdRepeller');
-        if (stored) {
-            const data = JSON.parse(stored);
-            appState.activityLog = data.log || [];
-            appState.detectionCount = data.counts || { today: 0, total: 0 };
-            console.log('✓ Data loaded from localStorage');
+        activityLogs.unshift(log); // Add to beginning
+        
+        // Keep only last 50 logs
+        if (activityLogs.length > 50) {
+            activityLogs.pop();
         }
-    } catch (error) {
-        console.warn('⚠️ Error loading from localStorage:', error);
-    }
-}
 
-// ============================================
-// CLEANUP
-// ============================================
-
-window.addEventListener('beforeunload', () => {
-    if (appState.autoRefreshInterval) {
-        clearInterval(appState.autoRefreshInterval);
+        localStorage.setItem('birdRepellerLogs', JSON.stringify(activityLogs));
+        renderLogs();
     }
-    saveToLocalStorage();
+
+    /**
+     * Render logs to UI
+     */
+    function renderLogs() {
+        elements.activityList.innerHTML = '';
+        
+        if (activityLogs.length === 0) {
+            if(elements.emptyLogMsg) elements.activityList.appendChild(elements.emptyLogMsg);
+            return;
+        }
+
+        activityLogs.forEach(log => {
+            const li = document.createElement('li');
+            li.className = 'bg-gray-800/50 p-4 rounded-xl border border-gray-700/50 flex justify-between items-center log-item-enter';
+            
+            li.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-red-400/10 text-red-400 flex items-center justify-center">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <div>
+                        <p class="font-medium text-red-400">Hama Terdeteksi</p>
+                        <p class="text-xs text-gray-400"><i class="fa-regular fa-clock mr-1"></i> ${log.time}</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="font-bold">${log.distance} cm</p>
+                </div>
+            `;
+            elements.activityList.appendChild(li);
+        });
+    }
+
+    // Clear Logs Event
+    elements.clearLogBtn.addEventListener('click', () => {
+        if (confirm('Apakah Anda yakin ingin menghapus semua log aktivitas?')) {
+            activityLogs = [];
+            localStorage.removeItem('birdRepellerLogs');
+            renderLogs();
+            
+            // Re-add empty message
+            elements.activityList.innerHTML = '<li class="text-center text-gray-500 italic py-4" id="empty-log-msg">Belum ada aktivitas tercatat</li>';
+            elements.emptyLogMsg = document.getElementById('empty-log-msg');
+        }
+    });
+
+    // Start fetching cycle
+    async function startApp() {
+        // Initial fetch
+        await updateDeviceStatus();
+        await fetchSensorData();
+
+        // Setup intervals
+        setInterval(updateDeviceStatus, 10000); // Check online status every 10s
+        setInterval(fetchSensorData, BLYNK_CONFIG.refreshInterval); // Fetch data every X ms
+    }
+
+    startApp();
 });
