@@ -57,6 +57,14 @@ async function refreshData() {
         updateActivityDisplay();
         updateLastUpdateTime();
         
+        // Debug info
+        if (!onlineStatus) {
+            console.warn('⚠️ Device offline - Pastikan:');
+            console.warn('1. Arduino sudah upload kode dengan BLYNK_READ(V0-V3)');
+            console.warn('2. Token di config.js benar');
+            console.warn('3. ESP32 terhubung ke WiFi dan Blynk');
+        }
+        
         console.log('📊 Data synced:', { onlineStatus, pinData });
         
     } catch (error) {

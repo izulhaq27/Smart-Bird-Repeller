@@ -14,22 +14,21 @@ class BlynkAPI {
      */
     async request(endpoint, params = {}) {
         try {
-            const url = new URL(`${this.config.apiUrl}${endpoint}`);
-            
-            // Tambahkan auth token
-            url.searchParams.append('token', this.config.authToken);
+            // Build URL dengan token dan params
+            let url = `${this.config.apiUrl}${endpoint}?token=${this.config.authToken}`;
             
             // Tambahkan parameter lainnya
             Object.keys(params).forEach(key => {
-                url.searchParams.append(key, params[key]);
+                url += `&${key}=${encodeURIComponent(params[key])}`;
             });
 
-            console.log('🔗 API Request:', endpoint);
+            console.log('🔗 API Request:', url.substring(0, 50) + '...');
 
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
                 },
             });
 
