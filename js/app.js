@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // State
     let activityLogs = JSON.parse(localStorage.getItem('birdRepellerLogs')) || [];
-    let lastDetectionTime = 0;
+    let lastBuzzerState = '0';
 
     renderLogs();
 
@@ -137,14 +137,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ===== CHECK & LOG ACTIVITY =====
     function checkAndLogActivity(pir, distance, buzzer) {
-        if (buzzer == '1' && distance && parseFloat(distance) > 0) {
-            const now = Date.now();
-            // Ubah cooldown dari 10 detik (10000) menjadi 3 detik (3000) agar log lebih cepat muncul
-            if (now - lastDetectionTime > 3000) {
-                addLogEntry(distance);
-                lastDetectionTime = now;
-            }
+        // Hanya catat log JIKA buzzer baru saja menyala (perubahan dari 0 ke 1)
+        if (buzzer == '1' && lastBuzzerState == '0' && distance && parseFloat(distance) > 0) {
+            addLogEntry(distance);
         }
+        
+        // Simpan state buzzer saat ini untuk pengecekan berikutnya
+        lastBuzzerState = buzzer;
     }
 
     // ===== ADD LOG =====
