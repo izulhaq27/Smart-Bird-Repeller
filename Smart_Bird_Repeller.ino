@@ -39,11 +39,12 @@ float getDistance() {
   delayMicroseconds(10);
   digitalWrite(pinTrig, LOW);
   
-  long durasi = pulseIn(pinEcho, HIGH, 25000); 
+  // Timeout 60000us untuk jangkauan hingga ~1000cm
+  long durasi = pulseIn(pinEcho, HIGH, 60000); 
   float jarak = durasi * 0.034 / 2;
   
-  // LOGIKA BARU: Jika hasil 0 atau lebih dari 400cm (batas maksimal sensor HC-SR04), anggap tidak ada objek (kembalikan 0)
-  if (jarak == 0 || jarak > 400) { 
+  // LOGIKA BARU: Jika hasil 0 atau lebih dari 1000cm (sesuai Datastream V1), anggap tidak ada objek (kembalikan 0)
+  if (jarak == 0 || jarak > 1000) { 
     return 0; 
   }
   
