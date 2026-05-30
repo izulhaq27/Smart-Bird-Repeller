@@ -3,118 +3,138 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Bird Repeller Dashboard</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <title>Smart Bird Repeller | Dashboard</title>
+    <meta name="description" content="Dashboard monitoring real-time sistem pengusir burung berbasis IoT dengan ESP32 dan Blynk Cloud.">
+
+    <!-- Google Fonts: Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/style.css">
 </head>
-<body class="bg-gray-900 text-white min-h-screen font-outfit">
+<body>
 
-    <!-- Background Pattern -->
-    <div class="fixed inset-0 z-0 opacity-20 pointer-events-none" style="background-image: radial-gradient(#4ADE80 1px, transparent 1px); background-size: 30px 30px;"></div>
+    <!-- Animated Background -->
+    <div class="bg-orb bg-orb-1"></div>
+    <div class="bg-orb bg-orb-2"></div>
+    <div class="bg-orb bg-orb-3"></div>
+    <div class="noise-overlay"></div>
 
-    <div class="relative z-10 max-w-6xl mx-auto px-4 py-8">
-        
-        <!-- Header -->
-        <header class="flex flex-col md:flex-row justify-between items-center mb-10 glass-panel p-6 rounded-2xl">
-            <div class="flex items-center gap-4">
-                <div class="w-14 h-14 bg-green-500 rounded-full flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(74,222,128,0.5)]">
+    <div class="app-wrapper">
+
+        <!-- ===== HEADER ===== -->
+        <header class="header">
+            <div class="header-logo">
+                <div class="logo-icon">
                     <i class="fa-solid fa-crow"></i>
                 </div>
                 <div>
-                    <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600">Smart Bird Repeller</h1>
-                    <p class="text-gray-400 text-sm">IoT Crop Protection System</p>
+                    <h1 class="logo-title">Smart Bird Repeller</h1>
+                    <p class="logo-sub">IoT Crop Protection System</p>
                 </div>
             </div>
-            <div class="mt-4 md:mt-0 flex items-center gap-3 bg-gray-800/80 px-4 py-2 rounded-full border border-gray-700">
-                <div class="relative flex h-3 w-3">
-                  <span id="status-ping" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span id="status-dot" class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+
+            <div class="header-right">
+                <div class="status-badge" id="status-badge">
+                    <span class="status-dot" id="status-dot"></span>
+                    <span id="device-status">Checking...</span>
                 </div>
-                <span id="device-status" class="font-medium text-green-400">Device Online</span>
+                <div class="last-update">
+                    <i class="fa-solid fa-rotate fa-spin" id="refresh-icon"></i>
+                    <span id="last-update-time">--:--</span>
+                </div>
             </div>
         </header>
 
-        <!-- Dashboard Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            
-            <!-- Sensor PIR Card -->
-            <div class="glass-panel p-6 rounded-2xl flex flex-col justify-between card-hover">
-                <div class="flex justify-between items-start mb-4">
-                    <h3 class="text-gray-400 font-medium">Sensor Gerak (PIR)</h3>
-                    <i class="fa-solid fa-person-walking text-blue-400 text-xl"></i>
+        <!-- ===== SENSOR CARDS ===== -->
+        <section class="cards-grid">
+
+            <!-- PIR Card -->
+            <div class="card card--pir" id="card-pir">
+                <div class="card-header">
+                    <span class="card-label">Sensor Gerak</span>
+                    <div class="card-icon card-icon--blue">
+                        <i class="fa-solid fa-person-walking"></i>
+                    </div>
                 </div>
-                <div>
-                    <div id="pir-value" class="text-3xl font-bold mb-1">Aman</div>
-                    <p id="pir-desc" class="text-sm text-blue-400">Tidak ada pergerakan</p>
-                </div>
+                <div class="card-value" id="pir-value">AMAN</div>
+                <p class="card-desc" id="pir-desc">Tidak ada pergerakan</p>
+                <div class="card-badge card-badge--ok" id="pir-badge">PIR</div>
             </div>
 
-            <!-- Ultrasonic Card -->
-            <div class="glass-panel p-6 rounded-2xl flex flex-col justify-between card-hover">
-                <div class="flex justify-between items-start mb-4">
-                    <h3 class="text-gray-400 font-medium">Jarak Objek</h3>
-                    <i class="fa-solid fa-ruler text-purple-400 text-xl"></i>
-                </div>
-                <div>
-                    <div class="flex items-baseline gap-1">
-                        <span id="distance-value" class="text-4xl font-bold">--</span>
-                        <span class="text-gray-400">cm</span>
+            <!-- Distance Card -->
+            <div class="card card--distance" id="card-distance">
+                <div class="card-header">
+                    <span class="card-label">Jarak Objek</span>
+                    <div class="card-icon card-icon--purple">
+                        <i class="fa-solid fa-wave-square"></i>
                     </div>
-                    <p class="text-sm text-purple-400 mt-1">Sensor Ultrasonik</p>
                 </div>
+                <div class="card-value-group">
+                    <span class="card-value" id="distance-value">--</span>
+                    <span class="card-unit">cm</span>
+                </div>
+                <p class="card-desc">Sensor Ultrasonik HC-SR04</p>
+                <div class="card-badge card-badge--purple">V1</div>
             </div>
 
             <!-- Buzzer Card -->
-            <div class="glass-panel p-6 rounded-2xl flex flex-col justify-between card-hover">
-                <div class="flex justify-between items-start mb-4">
-                    <h3 class="text-gray-400 font-medium">Status Buzzer</h3>
-                    <i class="fa-solid fa-volume-high text-red-400 text-xl"></i>
+            <div class="card card--buzzer" id="card-buzzer">
+                <div class="card-header">
+                    <span class="card-label">Status Buzzer</span>
+                    <div class="card-icon card-icon--pink">
+                        <i class="fa-solid fa-volume-high"></i>
+                    </div>
                 </div>
-                <div>
-                    <div id="buzzer-value" class="text-3xl font-bold mb-1">OFF</div>
-                    <p id="buzzer-desc" class="text-sm text-gray-400">Alarm diam</p>
-                </div>
+                <div class="card-value" id="buzzer-value">OFF</div>
+                <p class="card-desc" id="buzzer-desc">Alarm tidak aktif</p>
+                <div class="card-indicator" id="buzzer-indicator"></div>
             </div>
 
             <!-- LED Card -->
-            <div class="glass-panel p-6 rounded-2xl flex flex-col justify-between card-hover">
-                <div class="flex justify-between items-start mb-4">
-                    <h3 class="text-gray-400 font-medium">Status LED</h3>
-                    <i class="fa-solid fa-lightbulb text-yellow-400 text-xl"></i>
+            <div class="card card--led" id="card-led">
+                <div class="card-header">
+                    <span class="card-label">Status LED</span>
+                    <div class="card-icon card-icon--yellow">
+                        <i class="fa-solid fa-lightbulb"></i>
+                    </div>
                 </div>
-                <div>
-                    <div id="led-value" class="text-3xl font-bold mb-1">OFF</div>
-                    <p id="led-desc" class="text-sm text-gray-400">Lampu mati</p>
-                </div>
+                <div class="card-value" id="led-value">OFF</div>
+                <p class="card-desc" id="led-desc">Lampu indikator mati</p>
+                <div class="card-indicator" id="led-indicator"></div>
             </div>
 
-        </div>
+        </section>
 
-        <!-- Activity Log -->
-        <div class="glass-panel rounded-2xl overflow-hidden flex flex-col h-[400px]">
-            <div class="p-6 border-b border-gray-700/50 bg-gray-800/30 flex justify-between items-center">
-                <h2 class="text-xl font-bold flex items-center gap-2">
-                    <i class="fa-solid fa-list-ul text-green-400"></i> Log Aktivitas
-                </h2>
-                <button id="clear-log" class="text-sm text-red-400 hover:text-red-300 transition-colors bg-red-400/10 px-3 py-1.5 rounded-lg border border-red-400/20">
-                    <i class="fa-solid fa-trash-can mr-1"></i> Bersihkan
+        <!-- ===== ACTIVITY LOG ===== -->
+        <section class="log-panel">
+            <div class="log-header">
+                <div class="log-title">
+                    <i class="fa-solid fa-timeline"></i>
+                    <h2>Log Aktivitas</h2>
+                    <span class="log-count" id="log-count">0</span>
+                </div>
+                <button class="btn-clear" id="clear-log">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span>Bersihkan</span>
                 </button>
             </div>
-            <div class="flex-1 overflow-y-auto p-2" id="log-container">
-                <ul id="activity-list" class="space-y-2 p-4">
-                    <!-- Logs will be inserted here dynamically -->
-                    <li class="text-center text-gray-500 italic py-4" id="empty-log-msg">Belum ada aktivitas tercatat</li>
+            <div class="log-body" id="log-container">
+                <ul class="log-list" id="activity-list">
+                    <li class="log-empty" id="empty-log-msg">
+                        <i class="fa-regular fa-clock fa-2x"></i>
+                        <p>Belum ada aktivitas tercatat</p>
+                    </li>
                 </ul>
             </div>
-        </div>
+        </section>
 
-    </div>
+    </div><!-- end app-wrapper -->
 
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
