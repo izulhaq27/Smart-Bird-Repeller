@@ -139,7 +139,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function checkAndLogActivity(pir, distance, buzzer) {
         if (buzzer == '1' && distance && parseFloat(distance) > 0) {
             const now = Date.now();
-            if (now - lastDetectionTime > 10000) {
+            // Ubah cooldown dari 10 detik (10000) menjadi 3 detik (3000) agar log lebih cepat muncul
+            if (now - lastDetectionTime > 3000) {
                 addLogEntry(distance);
                 lastDetectionTime = now;
             }
