@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Bird Repeller - Dashboard Monitoring</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-green: #10b981;
+            --secondary-green: #059669;
+            --light-green: #d1fae5;
+            --dark-green: #064e3b;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .gradient-header {
+            background: linear-gradient(135deg, var(--primary-green) 0%, var(--secondary-green) 100%);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .status-online {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-offline {
+            background-color: #fee2e2;
+            color: #7f1d1d;
+        }
+
+        .pulse-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .pulse-dot.online {
+            background-color: #10b981;
+        }
+
+        .pulse-dot.offline {
+            background-color: #ef4444;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        .activity-item {
+            border-left: 4px solid var(--primary-green);
+            padding-left: 16px;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(16, 185, 129, 0.3);
+            border-top-color: var(--primary-green);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
+            border: 1px solid var(--light-green);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="gradient-header text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-6">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-dove text-3xl"></i>
+                    <div>
+                        <h1 class="text-2xl font-bold">Smart Bird Repeller</h1>
+                        <p class="text-sm text-green-100">Sistem Monitoring Real-Time</p>
+                    </div>
+                </div>
+                <div class="text-right text-sm">
+                    <p id="lastUpdate">Terakhir diperbarui: -</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Status Section -->
+        <section class="mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Device Status Card -->
+                <div class="bg-white rounded-lg shadow-lg p-6 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-bold text-gray-800">Status Perangkat</h2>
+                        <i class="fas fa-microchip text-2xl text-green-600"></i>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <p class="text-gray-600 text-sm mb-2">Koneksi ESP32</p>
+                            <div class="flex items-center gap-2">
+                                <span class="pulse-dot online" id="statusPulse"></span>
+                                <span id="deviceStatus" class="status-badge status-online">
+                                    <i class="fas fa-check-circle"></i> Online
+                                </span>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-gray-600 text-sm mb-2">Koneksi Blynk</p>
+                            <p id="blynkStatus" class="text-sm text-gray-700">Memuat...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detection Statistics Card -->
+                <div class="bg-white rounded-lg shadow-lg p-6 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-bold text-gray-800">Statistik Deteksi</h2>
+                        <i class="fas fa-chart-bar text-2xl text-green-600"></i>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="stat-card rounded-lg p-4">
+                            <p class="text-gray-600 text-sm">Deteksi Hari Ini</p>
+                            <p id="detectionToday" class="text-3xl font-bold text-green-600 mt-2">0</p>
+                        </div>
+                        <div class="stat-card rounded-lg p-4">
+                            <p class="text-gray-600 text-sm">Total Deteksi</p>
+                            <p id="detectionTotal" class="text-3xl font-bold text-green-600 mt-2">0</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Activity Section -->
+        <section class="mb-8">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
+                    <h2 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-clock text-green-600 mr-2"></i>Log Aktivitas Terakhir
+                    </h2>
+                    <button onclick="refreshData()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition duration-200 flex items-center gap-2">
+                        <i class="fas fa-sync-alt" id="refreshIcon"></i> Refresh
+                    </button>
+                </div>
+
+                <div id="activityLog" class="space-y-3">
+                    <div class="flex items-center justify-center py-8">
+                        <div class="loading-spinner"></div>
+                        <span class="text-gray-600 ml-3">Memuat data...</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Sensor Details Section -->
+        <section class="mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- PIR Sensor -->
+                <div class="bg-white rounded-lg shadow-lg p-6 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-gray-800">Sensor PIR</h3>
+                        <i class="fas fa-radiation text-2xl text-green-600"></i>
+                    </div>
+                    <div class="space-y-2">
+                        <p class="text-gray-600 text-sm">Status Gerakan</p>
+                        <p id="pirStatus" class="text-xl font-bold text-gray-800">-</p>
+                        <div class="mt-4 pt-4 border-t border-gray-200">
+                            <p class="text-xs text-gray-500">Sensor PIR Pin: GPIO14</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ultrasonic Sensor -->
+                <div class="bg-white rounded-lg shadow-lg p-6 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-gray-800">Sensor Ultrasonik</h3>
+                        <i class="fas fa-wave-square text-2xl text-green-600"></i>
+                    </div>
+                    <div class="space-y-2">
+                        <p class="text-gray-600 text-sm">Jarak Terdeteksi</p>
+                        <p id="distanceValue" class="text-3xl font-bold text-green-600">-</p>
+                        <p id="distanceStatus" class="text-sm text-gray-600 mt-2">-</p>
+                        <div class="mt-4 pt-4 border-t border-gray-200">
+                            <p class="text-xs text-gray-500">Jarak Ambang: 500 cm</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Output Devices -->
+                <div class="bg-white rounded-lg shadow-lg p-6 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-gray-800">Output Devices</h3>
+                        <i class="fas fa-volume-up text-2xl text-green-600"></i>
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <p class="text-gray-600 text-sm">Buzzer</p>
+                            <p id="buzzerStatus" class="text-sm font-semibold text-gray-700 mt-1">Siap</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-600 text-sm">LED Indikator</p>
+                            <p id="ledStatus" class="text-sm font-semibold text-gray-700 mt-1">Mati</p>
+                        </div>
+                        <div class="mt-4 pt-4 border-t border-gray-200">
+                            <p class="text-xs text-gray-500">Buzzer: GPIO27 | LED: GPIO26</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Configuration Info Section -->
+        <section class="mb-8">
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                <div class="flex items-start gap-4 flex-wrap">
+                    <i class="fas fa-info-circle text-blue-600 text-xl mt-1"></i>
+                    <div>
+                        <h3 class="font-bold text-blue-900 mb-2">Informasi Sistem</h3>
+                        <p class="text-sm text-blue-800">Website ini terhubung ke Blynk IoT Cloud untuk memantau status Smart Bird Repeller secara real-time. Data diperbarui setiap 5 detik.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
