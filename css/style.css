@@ -23,9 +23,9 @@
     --blue:    #4d9fff;
     --green:   #2dff9a;
 
-    --text-primary:   #f0e8ff;
-    --text-secondary: rgba(240, 232, 255, 0.5);
-    --text-muted:     rgba(240, 232, 255, 0.3);
+    --text-primary:   #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.75);
+    --text-muted:     rgba(255, 255, 255, 0.55);
 
     --font: 'Plus Jakarta Sans', sans-serif;
     --radius-sm: 10px;
